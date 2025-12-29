@@ -1,62 +1,73 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Equalizadorelber</title>
-  <style>
-    body { font-family: Times New Roman, sans-serif; padding: 20px; }
-    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-    #bands { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
-    .band { border: 1px solid #ddd; border-radius: 10px; padding: 10px; width: 110px; }
-    .band__freq { font-weight: 700; margin-bottom: 8px; }
-    .band__value { margin-top: 6px; font-size: 12px; opacity: .8; }
-    input[type="range"] { width: 100%; }
-    .btn { padding: 8px 10px; cursor: pointer; }
-  </style>
-</head>
-<body>
+diff --git a/index.html b/index.html
+new file mode 100644
+index 0000000000000000000000000000000000000000..96e804b5b7be52d573aef6466d088924c1cf50dd
+--- /dev/null
++++ b/index.html
+@@ -0,0 +1,63 @@
++<!DOCTYPE html>
++<html lang="es">
++  <head>
++    <meta charset="UTF-8" />
++    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
++    <title>Ecualizador Web - Piloto</title>
++    <link rel="stylesheet" href="style.css" />
++  </head>
++  <body>
++    <main class="app">
++      <header class="app__header">
++        <div>
++          <p class="app__eyebrow">Piloto web</p>
++          <h1>Ecualizador de parlante</h1>
++          <p class="app__subtitle">
++            Carga un audio local y ajusta las 10 bandas del ecualizador en tiempo real.
++          </p>
++        </div>
++        <div class="app__actions">
++          <label class="file-upload">
++            <input id="audio-file" type="file" accept="audio/*" />
++            <span>Seleccionar audio</span>
++          </label>
++          <div class="preset-buttons">
++            <button class="btn" data-preset="flat">Flat</button>
++            <button class="btn" data-preset="rock">Rock</button>
++            <button class="btn" data-preset="bass">Bass Boost</button>
++            <button class="btn btn--ghost" data-preset="reset">Reset</button>
++          </div>
++          <div class="utility-controls">
++            <label class="toggle">
++              <input id="bypass-toggle" type="checkbox" />
++              <span>Bypass EQ</span>
++            </label>
++            <label class="master">
++              <span>Master</span>
++              <input id="master-gain" type="range" min="-12" max="6" step="0.5" value="0" />
++              <span id="master-value">0 dB</span>
++            </label>
++          </div>
++        </div>
++      </header>
++
++      <section class="player">
++        <audio id="audio" controls preload="metadata"></audio>
++        <div class="status">
++          <span id="status-text">Carga un archivo para comenzar.</span>
++          <span id="preset-text" class="preset-pill">Preset: Flat</span>
++        </div>
++      </section>
++
++      <section class="eq" id="eq">
++        <div class="eq__header">
++          <h2>10 bandas (±12 dB)</h2>
++          <p>Frecuencias estándar para un ecualizador gráfico.</p>
++        </div>
++        <div class="eq__bands" id="bands"></div>
++      </section>
++    </main>
++
++    <script src="app.js"></script>
++  </body>
++</html>
 
-  <h1>Equalizador ELBER 🎧</h1>
-
-  <div class="row">
-    <label>
-      <strong>Seleccionar audio:</strong>
-      <input id="audio-file" type="file" accept="audio/*" />
-    </label>
-  </div>
-
-  <p id="status-text">Carga un audio para empezar.</p>
-
-  <audio id="audio" controls></audio>
-
-  <hr>
-
-  <div class="row">
-    <button class="btn" data-preset="flat">Flat</button>
-    <button class="btn" data-preset="rock">Rock</button>
-    <button class="btn" data-preset="bass">Bass Boost</button>
-    <button class="btn" data-preset="reset">Reset</button>
-
-    <span id="preset-text">Preset: FLAT</span>
-  </div>
-
-  <div class="row" style="margin-top:10px;">
-    <label>
-      <input id="bypass-toggle" type="checkbox" />
-      Bypass EQ
-    </label>
-  </div>
-
-  <div class="row" style="margin-top:10px;">
-    <label>
-      Master Gain:
-      <input id="master-gain" type="range" min="-12" max="12" step="0.5" value="0"/>
-    </label>
-    <span id="master-value">0 dB</span>
-  </div>
-
-  <div id="bands"></div>
 
   <script src="app.js"></script>
 </body>

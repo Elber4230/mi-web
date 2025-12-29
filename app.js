@@ -1,9 +1,3 @@
-diff --git a/app.js b/app.js
-new file mode 100644
-index 0000000000000000000000000000000000000000..00f91a851cef97b17368ae385672511fbb5b1b61
---- /dev/null
-+++ b/app.js
-@@ -0,0 +1,204 @@
 +const bands = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 +const presets = {
 +  flat: Array(10).fill(0),

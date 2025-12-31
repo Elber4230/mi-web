@@ -3,75 +3,104 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ecualizador Web - Piloto</title>
-    <link rel="stylesheet" href="style.css" />
+    <title>Collage online</title>
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="app">
-      <header class="app__header">
+    <div class="page">
+      <header class="hero">
         <div>
-          <p class="app__eyebrow">Piloto web</p>
-          <h1>Ecualizador de parlante</h1>
-          <p class="app__subtitle">
-            Usa un archivo local o el micrófono para ajustar las 10 bandas del ecualizador en tiempo real.
+          <p class="eyebrow">Collage de fotos</p>
+          <h1>Tu collage en minutos, desde el navegador</h1>
+          <p class="lead">
+            Sube tus fotos, deja que el sistema las acomode automáticamente y descarga tu collage en tamaño carta.
           </p>
         </div>
-        <div class="app__actions">
-          <div class="source-controls">
-            <span class="source-controls__label">Fuente</span>
-            <div class="source-controls__buttons">
-              <button class="btn btn--active" id="source-file">Archivo</button>
-              <button class="btn btn--ghost" id="source-mic">Micrófono</button>
+        <div class="hero-card">
+          <div class="hero-card__preview">
+            <div class="preview-grid">
+              <span></span><span></span><span></span><span></span>
             </div>
           </div>
-          <label class="file-upload" id="file-upload">
-            <input id="audio-file" type="file" accept="audio/*" />
-            <span>Seleccionar audio</span>
-          </label>
-          <button class="btn btn--outline" id="mic-toggle" type="button" hidden>
-            Activar micrófono
-          </button>
-          <div class="preset-buttons">
-            <button class="btn" data-preset="flat">Flat</button>
-            <button class="btn" data-preset="rock">Rock</button>
-            <button class="btn" data-preset="bass">Bass Boost</button>
-            <button class="btn" data-preset="rb">R&amp;B</button>
-            <button class="btn" data-preset="vallenato">Vallenato</button>
-            <button class="btn" data-preset="pop">Pop</button>
-            <button class="btn btn--ghost" data-preset="reset">Reset</button>
-          </div>
-          <div class="utility-controls">
-            <label class="toggle">
-              <input id="bypass-toggle" type="checkbox" />
-              <span>Bypass EQ</span>
-            </label>
-            <label class="master">
-              <span>Master</span>
-              <input id="master-gain" type="range" min="-12" max="6" step="0.5" value="0" />
-              <span id="master-value">0 dB</span>
-            </label>
-          </div>
+          <p class="hero-card__caption">Diseños inteligentes + exportación en PDF tamaño carta</p>
         </div>
       </header>
 
-      <section class="player">
-        <audio id="audio" controls preload="metadata"></audio>
-        <div class="status">
-          <span id="status-text">Carga un archivo para comenzar.</span>
-          <span id="preset-text" class="preset-pill">Preset: Flat</span>
-        </div>
-        <p id="warning-notice" class="notice" hidden></p>
-      </section>
+      <main class="layout">
+        <section class="panel">
+          <h2>1. Sube tus fotos</h2>
+          <p class="muted">Selecciona varias imágenes (JPG/PNG) para empezar.</p>
+          <label class="upload">
+            <input id="fileInput" type="file" accept="image/*" multiple />
+            <div>
+              <strong>Haz clic para cargar</strong>
+              <span class="muted">o arrastra y suelta tus fotos aquí</span>
+            </div>
+          </label>
 
-      <section class="eq" id="eq">
-        <div class="eq__header">
-          <h2>10 bandas (±12 dB)</h2>
-          <p>Frecuencias estándar para un ecualizador gráfico.</p>
-        </div>
-        <div class="eq__bands" id="bands"></div>
-      </section>
-    </main>
+          <div class="thumbs" id="thumbs"></div>
+        </section>
 
-    <script src="app.js" defer></script>
+        <section class="panel">
+          <h2>2. Configura el collage</h2>
+          <div class="form-grid">
+            <label>
+              Diseño
+              <select id="layoutSelect">
+                <option value="auto" selected>Automático (recomendado)</option>
+                <option value="2x2">Cuadrícula 2 x 2</option>
+                <option value="3x3">Cuadrícula 3 x 3</option>
+                <option value="1x3">Tira vertical 1 x 3</option>
+                <option value="3x1">Tira horizontal 3 x 1</option>
+                <option value="mosaic">Mosaico editorial</option>
+              </select>
+            </label>
+            <label>
+              Tamaño de exportación
+              <select id="sizeSelect">
+                <option value="letter" selected>Tamaño carta (2550 x 3300 px)</option>
+                <option value="1080">1080 x 1080 px</option>
+                <option value="1600">1600 x 1600 px</option>
+                <option value="2048">2048 x 2048 px</option>
+              </select>
+            </label>
+            <label>
+              Formato de descarga
+              <select id="formatSelect">
+                <option value="pdf" selected>PDF</option>
+                <option value="png">PNG</option>
+              </select>
+            </label>
+            <label>
+              Espaciado
+              <input id="gapInput" type="range" min="0" max="40" value="12" />
+            </label>
+            <label>
+              Color de fondo
+              <input id="bgInput" type="color" value="#ffffff" />
+            </label>
+          </div>
+          <div class="actions">
+            <button id="renderBtn" class="primary">Generar collage</button>
+            <button id="downloadBtn" class="secondary" disabled>Descargar archivo</button>
+          </div>
+        </section>
+
+        <section class="panel preview">
+          <h2>3. Vista previa</h2>
+          <p class="muted">Tu collage aparecerá aquí cuando lo generes.</p>
+          <div class="canvas-wrap">
+            <canvas id="collageCanvas" width="2550" height="3300"></canvas>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <footer class="footer">
+      <p>Hecho con ♥ para crear collages online.</p>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-4t2Y0rZI9H5pGOkQ0Nt0g/1m2t+I7U7rQ7B2gD5E1Ey/QuOstPx0xTGxN6D7eE+1oHJU5gvbD8s0P7C0QmV0vA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="app.js"></script>
   </body>
 </html>

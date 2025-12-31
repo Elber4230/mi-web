@@ -3,6 +3,8 @@ const thumbs = document.getElementById("thumbs");
 const layoutSelect = document.getElementById("layoutSelect");
 const sizeSelect = document.getElementById("sizeSelect");
 const formatSelect = document.getElementById("formatSelect");
+const smartOrientToggle = document.getElementById("smartOrientToggle");
+const smartStatus = document.getElementById("smartStatus");
 const gapInput = document.getElementById("gapInput");
 const bgInput = document.getElementById("bgInput");
 const renderBtn = document.getElementById("renderBtn");
@@ -11,13 +13,18 @@ const canvas = document.getElementById("collageCanvas");
 const ctx = canvas.getContext("2d");
 
 let images = [];
+let originalImages = [];
+let isOrienting = false;
+let faceDetectorPromise = null;
 const landscapeCache = new WeakMap();
+const smartCache = new WeakMap();
 
-function loadImages(files) {
+async function loadImages(files) {
   const fileArray = Array.from(files || []);
   if (!fileArray.length) return;
 
   images = [];
+  originalImages = [];
   thumbs.innerHTML = "";
 
   const readers = fileArray.map((file) =>
@@ -34,18 +41,18 @@ function loadImages(files) {
     })
   );
 
-  Promise.all(readers)
-    .then((loaded) => {
-      images = loaded;
-      loaded.forEach((img) => {
-        const thumb = document.createElement("img");
-        thumb.src = img.src;
-        thumbs.appendChild(thumb);
-      });
-    })
-    .catch((error) => {
-      console.error("Error cargando imágenes", error);
+  try {
+    const loaded = await Promise.all(readers);
+    originalImages = loaded;
+    loaded.forEach((img) => {
+      const thumb = document.createElement("img");
+      thumb.src = img.src;
+      thumbs.appendChild(thumb);
     });
+    await applySmartOrientation();
+  } catch (error) {
+    console.error("Error cargando imágenes", error);
+  }
 }
 
 function getCanvasSize() {
@@ -80,6 +87,7 @@ function getLayoutConfig() {
 
 function getAutoGrid(count, width, height) {
   if (count <= 1) return { rows: 1, cols: 1 };
+  if (count === 5) return { rows: 2, cols: 3 };
 
   const targetRatio = width / height;
   let best = { rows: 1, cols: count, score: Number.NEGATIVE_INFINITY };
@@ -133,8 +141,135 @@ function getLandscapeSource(img) {
   return rotated;
 }
 
+function createRotatedCanvas(source, rotationDeg) {
+  const rotation = ((rotationDeg % 360) + 360) % 360;
+  const needsSwap = rotation === 90 || rotation === 270;
+  const canvas = document.createElement("canvas");
+  canvas.width = needsSwap ? source.height : source.width;
+  canvas.height = needsSwap ? source.width : source.height;
+  const rctx = canvas.getContext("2d");
+  rctx.translate(canvas.width / 2, canvas.height / 2);
+  rctx.rotate((rotation * Math.PI) / 180);
+  rctx.drawImage(source, -source.width / 2, -source.height / 2);
+  return canvas;
+}
+
+async function ensureFaceDetector() {
+  if (faceDetectorPromise) {
+    return faceDetectorPromise;
+  }
+
+  if (!window.faceDetection || !window.tf) {
+    smartStatus.textContent =
+      "Orientación inteligente: no disponible (faltan librerías).";
+    return null;
+  }
+
+  smartStatus.textContent = "Orientación inteligente: cargando detector...";
+  faceDetectorPromise = window.faceDetection
+    .createDetector(window.faceDetection.SupportedModels.MediaPipeFaceDetector, {
+      runtime: "tfjs",
+      maxFaces: 1,
+    })
+    .then((detector) => {
+      smartStatus.textContent =
+        "Orientación inteligente: detector listo. Analizando fotos.";
+      return detector;
+    })
+    .catch((error) => {
+      console.error("Error cargando detector", error);
+      smartStatus.textContent =
+        "Orientación inteligente: no disponible (error de carga).";
+      return null;
+    });
+
+  return faceDetectorPromise;
+}
+
+async function detectFaceScore(detector, source) {
+  try {
+    const detections = await detector.estimateFaces(source, {
+      flipHorizontal: false,
+    });
+    if (!detections || !detections.length) {
+      return 0;
+    }
+    const score = detections.reduce(
+      (sum, detection) => sum + (detection.score || 0),
+      0
+    );
+    return score;
+  } catch (error) {
+    console.error("Error detectando rostros", error);
+    return 0;
+  }
+}
+
+async function getSmartOrientedSource(img) {
+  if (smartCache.has(img)) {
+    return smartCache.get(img);
+  }
+
+  const detector = await ensureFaceDetector();
+  if (!detector) {
+    const fallback = getLandscapeSource(img);
+    smartCache.set(img, fallback);
+    return fallback;
+  }
+
+  const rotations = [0, 90, 180, 270];
+  let best = { score: -1, canvas: img };
+
+  for (const rotation of rotations) {
+    const rotated = createRotatedCanvas(img, rotation);
+    const score = await detectFaceScore(detector, rotated);
+    if (score > best.score) {
+      best = { score, canvas: rotated };
+    }
+  }
+
+  let oriented = best.canvas;
+  if (oriented.width < oriented.height) {
+    oriented = createRotatedCanvas(oriented, 90);
+  }
+
+  smartCache.set(img, oriented);
+  return oriented;
+}
+
+async function applySmartOrientation() {
+  if (!originalImages.length) {
+    return;
+  }
+
+  if (!smartOrientToggle.checked) {
+    images = originalImages.map((img) => getLandscapeSource(img));
+    smartStatus.textContent =
+      "Orientación inteligente: desactivada. Usando horizontal estándar.";
+    return;
+  }
+
+  isOrienting = true;
+  smartStatus.textContent = "Orientación inteligente: analizando fotos...";
+  const oriented = [];
+
+  for (const img of originalImages) {
+    // eslint-disable-next-line no-await-in-loop
+    const orientedImg = await getSmartOrientedSource(img);
+    oriented.push(orientedImg);
+  }
+
+  images = oriented;
+  isOrienting = false;
+  smartStatus.textContent = "Orientación inteligente: lista.";
+}
+
 function renderCollage() {
   if (!images.length) return;
+  if (isOrienting) {
+    alert("Espera a que termine la orientación inteligente.");
+    return;
+  }
 
   const { width, height } = getCanvasSize();
   canvas.width = width;
@@ -176,6 +311,13 @@ function renderCollage() {
   const { rows, cols } = layout;
   const cellW = (availableWidth - gap * (cols + 1)) / cols;
   const cellH = (height - gap * (rows + 1)) / rows;
+  const gridWidth = cols * cellW + gap * (cols + 1);
+  const startX = leftMargin + Math.max(0, availableWidth - gridWidth);
+
+  if (cellW <= 0 || cellH <= 0) {
+    alert("no se puede escalar");
+    return;
+  }
 
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
@@ -184,7 +326,7 @@ function renderCollage() {
         continue;
       }
       const img = getLandscapeSource(images[index]);
-      const x = leftMargin + gap + col * (cellW + gap);
+      const x = startX + gap + col * (cellW + gap);
       const y = gap + row * (cellH + gap);
       drawImageCover(img, x, y, cellW, cellH);
     }
@@ -221,6 +363,10 @@ fileInput.addEventListener("change", (event) => {
 renderBtn.addEventListener("click", renderCollage);
 
 downloadBtn.addEventListener("click", downloadCollage);
+
+smartOrientToggle.addEventListener("change", () => {
+  applySmartOrientation();
+});
 
 const uploadLabel = document.querySelector(".upload");
 

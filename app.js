@@ -11,6 +11,7 @@ const canvas = document.getElementById("collageCanvas");
 const ctx = canvas.getContext("2d");
 
 let images = [];
+const landscapeCache = new WeakMap();
 
 function loadImages(files) {
   const fileArray = Array.from(files || []);
@@ -106,6 +107,27 @@ function drawImageCover(img, x, y, w, h) {
   ctx.drawImage(img, nx, ny, nw, nh);
 }
 
+function getLandscapeSource(img) {
+  if (img.width >= img.height) {
+    return img;
+  }
+
+  const cached = landscapeCache.get(img);
+  if (cached) {
+    return cached;
+  }
+
+  const rotated = document.createElement("canvas");
+  rotated.width = img.height;
+  rotated.height = img.width;
+  const rctx = rotated.getContext("2d");
+  rctx.translate(rotated.width / 2, rotated.height / 2);
+  rctx.rotate(Math.PI / 2);
+  rctx.drawImage(img, -img.width / 2, -img.height / 2);
+  landscapeCache.set(img, rotated);
+  return rotated;
+}
+
 function renderCollage() {
   if (!images.length) return;
 
@@ -113,7 +135,7 @@ function renderCollage() {
   canvas.width = width;
   canvas.height = height;
 
-  const gap = Number(gapInput.value);
+  const gap = Math.max(6, Number(gapInput.value));
   const leftMargin = getLeftMarginPx();
   const availableWidth = width - leftMargin;
   const bg = bgInput.value;
@@ -132,7 +154,7 @@ function renderCollage() {
     ];
 
     slots.forEach((slot, index) => {
-      const img = images[index % images.length];
+      const img = getLandscapeSource(images[index % images.length]);
       const x = leftMargin + slot.x * availableWidth + gap / 2;
       const y = slot.y * height + gap / 2;
       const w = slot.w * availableWidth - gap;
@@ -153,7 +175,7 @@ function renderCollage() {
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
       const index = row * cols + col;
-      const img = images[index % images.length];
+      const img = getLandscapeSource(images[index % images.length]);
       const x = leftMargin + gap + col * (cellW + gap);
       const y = gap + row * (cellH + gap);
       drawImageCover(img, x, y, cellW, cellH);

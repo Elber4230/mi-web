@@ -71,6 +71,10 @@
                 <option value="png">PNG</option>
               </select>
             </label>
+            <label class="toggle">
+              <input id="smartOrientToggle" type="checkbox" checked />
+              <span>Orientación inteligente (rostros)</span>
+            </label>
             <label>
               Espaciado
               <input id="gapInput" type="range" min="0" max="40" value="12" />
@@ -80,6 +84,9 @@
               <input id="bgInput" type="color" value="#ffffff" />
             </label>
           </div>
+          <p class="muted" id="smartStatus">
+            Orientación inteligente: analizando fotos si detecta rostros.
+          </p>
           <div class="actions">
             <button id="renderBtn" class="primary">Generar collage</button>
             <button id="downloadBtn" class="secondary" disabled>Descargar archivo</button>
@@ -101,6 +108,8 @@
     </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" integrity="sha512-4t2Y0rZI9H5pGOkQ0Nt0g/1m2t+I7U7rQ7B2gD5E1Ey/QuOstPx0xTGxN6D7eE+1oHJU5gvbD8s0P7C0QmV0vA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-detection@1.0.2/dist/face-detection.min.js" crossorigin="anonymous"></script>
     <script src="app.js"></script>
   </body>
 </html>

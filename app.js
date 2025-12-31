@@ -111,8 +111,8 @@ function getAutoGrid(count, width, height) {
   return { rows: best.rows, cols: best.cols };
 }
 
-function drawImageCover(img, x, y, w, h) {
-  const ratio = Math.max(w / img.width, h / img.height);
+function drawImageContain(img, x, y, w, h) {
+  const ratio = Math.min(w / img.width, h / img.height);
   const nw = img.width * ratio;
   const nh = img.height * ratio;
   const nx = x + (w - nw) / 2;
@@ -162,14 +162,24 @@ async function ensureFaceDetector() {
   if (!window.faceDetection || !window.tf) {
     smartStatus.textContent =
       "Orientación inteligente: no disponible (faltan librerías).";
+    smartOrientToggle.checked = false;
     return null;
   }
 
   smartStatus.textContent = "Orientación inteligente: cargando detector...";
-  faceDetectorPromise = window.faceDetection
-    .createDetector(window.faceDetection.SupportedModels.MediaPipeFaceDetector, {
-      runtime: "tfjs",
-      maxFaces: 1,
+  faceDetectorPromise = window.tf
+    .ready()
+    .then(async () => {
+      if (window.tf.getBackend() !== "cpu") {
+        await window.tf.setBackend("cpu");
+      }
+      return window.faceDetection.createDetector(
+        window.faceDetection.SupportedModels.MediaPipeFaceDetector,
+        {
+          runtime: "tfjs",
+          maxFaces: 1,
+        }
+      );
     })
     .then((detector) => {
       smartStatus.textContent =
@@ -180,6 +190,7 @@ async function ensureFaceDetector() {
       console.error("Error cargando detector", error);
       smartStatus.textContent =
         "Orientación inteligente: no disponible (error de carga).";
+      smartOrientToggle.checked = false;
       return null;
     });
 
@@ -228,7 +239,7 @@ async function getSmartOrientedSource(img) {
     }
   }
 
-  let oriented = best.canvas;
+  let oriented = best.score > 0 ? best.canvas : getLandscapeSource(img);
   if (oriented.width < oriented.height) {
     oriented = createRotatedCanvas(oriented, 90);
   }
@@ -251,6 +262,15 @@ async function applySmartOrientation() {
 
   isOrienting = true;
   smartStatus.textContent = "Orientación inteligente: analizando fotos...";
+  const detector = await ensureFaceDetector();
+  if (!detector) {
+    images = originalImages.map((img) => getLandscapeSource(img));
+    isOrienting = false;
+    smartStatus.textContent =
+      "Orientación inteligente: no disponible. Usando horizontal estándar.";
+    return;
+  }
+
   const oriented = [];
 
   for (const img of originalImages) {
@@ -299,7 +319,7 @@ function renderCollage() {
       const y = slot.y * height + gap / 2;
       const w = slot.w * availableWidth - gap;
       const h = slot.h * height - gap;
-      drawImageCover(img, x, y, w, h);
+      drawImageContain(img, x, y, w, h);
     });
 
     downloadBtn.disabled = false;
@@ -328,7 +348,7 @@ function renderCollage() {
       const img = getLandscapeSource(images[index]);
       const x = startX + gap + col * (cellW + gap);
       const y = gap + row * (cellH + gap);
-      drawImageCover(img, x, y, cellW, cellH);
+      drawImageContain(img, x, y, cellW, cellH);
     }
   }
 

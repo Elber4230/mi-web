@@ -82,15 +82,20 @@ function getAutoGrid(count, width, height) {
   if (count <= 1) return { rows: 1, cols: 1 };
 
   const targetRatio = width / height;
-  let best = { rows: 1, cols: count, score: Number.POSITIVE_INFINITY };
+  let best = { rows: 1, cols: count, score: Number.NEGATIVE_INFINITY };
 
   for (let rows = 1; rows <= count; rows += 1) {
     const cols = Math.ceil(count / rows);
     const gridRatio = cols / rows;
     const empty = rows * cols - count;
-    const score = Math.abs(Math.log(gridRatio / targetRatio)) + empty * 0.25;
+    const cellW = width / cols;
+    const cellH = height / rows;
+    const areaScore = cellW * cellH;
+    const ratioScore = -Math.abs(Math.log(gridRatio / targetRatio)) * 5000;
+    const emptyPenalty = empty * 20000;
+    const score = areaScore + ratioScore - emptyPenalty;
 
-    if (score < best.score) {
+    if (score > best.score) {
       best = { rows, cols, score };
     }
   }
@@ -153,8 +158,8 @@ function renderCollage() {
       { x: 0.33, y: 0.62, w: 0.67, h: 0.38 },
     ];
 
-    slots.forEach((slot, index) => {
-      const img = getLandscapeSource(images[index % images.length]);
+    slots.slice(0, images.length).forEach((slot, index) => {
+      const img = getLandscapeSource(images[index]);
       const x = leftMargin + slot.x * availableWidth + gap / 2;
       const y = slot.y * height + gap / 2;
       const w = slot.w * availableWidth - gap;
@@ -175,7 +180,10 @@ function renderCollage() {
   for (let row = 0; row < rows; row += 1) {
     for (let col = 0; col < cols; col += 1) {
       const index = row * cols + col;
-      const img = getLandscapeSource(images[index % images.length]);
+      if (index >= images.length) {
+        continue;
+      }
+      const img = getLandscapeSource(images[index]);
       const x = leftMargin + gap + col * (cellW + gap);
       const y = gap + row * (cellH + gap);
       drawImageCover(img, x, y, cellW, cellH);

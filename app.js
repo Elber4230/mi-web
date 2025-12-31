@@ -1,388 +1,219 @@
-const bands = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
-const presets = {
-  flat: Array(10).fill(0),
-  rock: [4, 3, 2, 1, -1, -1, 1, 3, 4, 5],
-  bass: [6, 5, 3, 1, 0, -1, -1, -1, -2, -2],
-  rb: [5, 4, 2, 1, 0, 1, 2, 1, 0, -1],
-  vallenato: [3, 2, 1, 0, 1, 2, 3, 2, 1, 0],
-  pop: [2, 1, 0, 1, 2, 2, 1, 0, 1, 2],
-};
+const fileInput = document.getElementById("fileInput");
+const thumbs = document.getElementById("thumbs");
+const layoutSelect = document.getElementById("layoutSelect");
+const sizeSelect = document.getElementById("sizeSelect");
+const formatSelect = document.getElementById("formatSelect");
+const gapInput = document.getElementById("gapInput");
+const bgInput = document.getElementById("bgInput");
+const renderBtn = document.getElementById("renderBtn");
+const downloadBtn = document.getElementById("downloadBtn");
+const canvas = document.getElementById("collageCanvas");
+const ctx = canvas.getContext("2d");
 
-const presetLabels = {
-  flat: "Flat",
-  rock: "Rock",
-  bass: "Bass Boost",
-  rb: "R&B",
-  vallenato: "Vallenato",
-  pop: "Pop",
-};
+let images = [];
 
-const state = {
-  context: null,
-  source: null,
-  sourceType: "file",
-  masterGain: null,
-  filters: [],
-  gains: Array(10).fill(0),
-  bypass: false,
-  currentPreset: "flat",
-  currentUrl: null,
-  mediaStream: null,
-  bandControls: [],
-};
+function loadImages(files) {
+  const fileArray = Array.from(files || []);
+  if (!fileArray.length) return;
 
-const audioElement = document.getElementById("audio");
-const fileInput = document.getElementById("audio-file");
-const fileUpload = document.getElementById("file-upload");
-const micToggle = document.getElementById("mic-toggle");
-const sourceFileButton = document.getElementById("source-file");
-const sourceMicButton = document.getElementById("source-mic");
-const bandsContainer = document.getElementById("bands");
-const statusText = document.getElementById("status-text");
-const presetText = document.getElementById("preset-text");
-const bypassToggle = document.getElementById("bypass-toggle");
-const masterGainSlider = document.getElementById("master-gain");
-const masterGainValue = document.getElementById("master-value");
-const warningNotice = document.getElementById("warning-notice");
+  images = [];
+  thumbs.innerHTML = "";
 
-const formatFrequency = (frequency) =>
-  frequency >= 1000 ? `${frequency / 1000}kHz` : `${frequency}Hz`;
+  const readers = fileArray.map((file) =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = reader.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    })
+  );
 
-const setStatus = (message, { warning = false } = {}) => {
-  statusText.textContent = message;
-  statusText.classList.toggle("status--warning", warning);
-};
+  Promise.all(readers)
+    .then((loaded) => {
+      images = loaded;
+      loaded.forEach((img) => {
+        const thumb = document.createElement("img");
+        thumb.src = img.src;
+        thumbs.appendChild(thumb);
+      });
+    })
+    .catch((error) => {
+      console.error("Error cargando imágenes", error);
+    });
+}
 
-const showNotice = (message) => {
-  if (!warningNotice) {
-    return;
-  }
-  warningNotice.textContent = message;
-  warningNotice.hidden = false;
-};
-
-const hideNotice = () => {
-  if (!warningNotice) {
-    return;
-  }
-  warningNotice.hidden = true;
-};
-
-const disableControls = () => {
-  fileInput.disabled = true;
-  bypassToggle.disabled = true;
-  masterGainSlider.disabled = true;
-  micToggle.disabled = true;
-  sourceFileButton.disabled = true;
-  sourceMicButton.disabled = true;
-  document.querySelectorAll("[data-preset]").forEach((button) => {
-    button.disabled = true;
-  });
-  state.bandControls.forEach((control) => {
-    control.slider.disabled = true;
-  });
-};
-
-const setActiveSourceButton = (activeButton, inactiveButton) => {
-  activeButton.classList.add("btn--active");
-  activeButton.classList.remove("btn--ghost");
-  inactiveButton.classList.remove("btn--active");
-  inactiveButton.classList.add("btn--ghost");
-};
-
-const ensureAudioContext = () => {
-  if (!window.AudioContext && !window.webkitAudioContext) {
-    setStatus("Este navegador no soporta Web Audio API.", { warning: true });
-    disableControls();
-    return false;
+function getCanvasSize() {
+  if (sizeSelect.value === "letter") {
+    return { width: 2550, height: 3300 };
   }
 
-  if (!state.context) {
-    state.context = new (window.AudioContext || window.webkitAudioContext)();
-    createFilters();
-    state.masterGain = state.context.createGain();
-    state.masterGain.gain.value = 1;
-  }
-  if (state.context.state === "suspended") {
-    state.context.resume();
-  }
-  return true;
-};
+  const size = Number(sizeSelect.value);
+  return { width: size, height: size };
+}
 
-const createFilters = () => {
-  state.filters = bands.map((frequency) => {
-    const filter = state.context.createBiquadFilter();
-    filter.type = "peaking";
-    filter.frequency.value = frequency;
-    filter.Q.value = 1.1;
-    filter.gain.value = 0;
-    return filter;
-  });
-};
-
-const connectAudioGraph = () => {
-  if (!state.context) {
-    return;
+function getLeftMarginPx() {
+  if (sizeSelect.value !== "letter") {
+    return 0;
   }
-  if (!state.source) {
-    if (state.sourceType === "mic" && state.mediaStream) {
-      state.source = state.context.createMediaStreamSource(state.mediaStream);
-    } else if (state.sourceType === "file") {
-      state.source = state.context.createMediaElementSource(audioElement);
-    } else {
-      return;
+
+  const pixelsPerInch = 300;
+  const centimetersPerInch = 2.54;
+  const marginCm = 0.5;
+  return Math.round((marginCm / centimetersPerInch) * pixelsPerInch);
+}
+
+function getLayoutConfig() {
+  const layout = layoutSelect.value;
+  if (layout === "auto") return { auto: true };
+  if (layout === "2x2") return { rows: 2, cols: 2 };
+  if (layout === "3x3") return { rows: 3, cols: 3 };
+  if (layout === "1x3") return { rows: 3, cols: 1 };
+  if (layout === "3x1") return { rows: 1, cols: 3 };
+  return { rows: 2, cols: 2, mosaic: true };
+}
+
+function getAutoGrid(count, width, height) {
+  if (count <= 1) return { rows: 1, cols: 1 };
+
+  const targetRatio = width / height;
+  let best = { rows: 1, cols: count, score: Number.POSITIVE_INFINITY };
+
+  for (let rows = 1; rows <= count; rows += 1) {
+    const cols = Math.ceil(count / rows);
+    const gridRatio = cols / rows;
+    const empty = rows * cols - count;
+    const score = Math.abs(Math.log(gridRatio / targetRatio)) + empty * 0.25;
+
+    if (score < best.score) {
+      best = { rows, cols, score };
     }
   }
 
-  state.source.disconnect();
-  state.filters.forEach((filter) => filter.disconnect());
-  state.masterGain.disconnect();
+  return { rows: best.rows, cols: best.cols };
+}
 
-  if (state.bypass) {
-    state.source.connect(state.context.destination);
-    return;
-  }
+function drawImageCover(img, x, y, w, h) {
+  const ratio = Math.max(w / img.width, h / img.height);
+  const nw = img.width * ratio;
+  const nh = img.height * ratio;
+  const nx = x + (w - nw) / 2;
+  const ny = y + (h - nh) / 2;
+  ctx.drawImage(img, nx, ny, nw, nh);
+}
 
-  let currentNode = state.source;
-  state.filters.forEach((filter) => {
-    currentNode.connect(filter);
-    currentNode = filter;
-  });
-  currentNode.connect(state.masterGain);
-  state.masterGain.connect(state.context.destination);
-};
+function renderCollage() {
+  if (!images.length) return;
 
-const renderBands = () => {
-  bandsContainer.innerHTML = "";
-  state.bandControls = [];
-  bands.forEach((frequency, index) => {
-    const band = document.createElement("div");
-    band.className = "band";
+  const { width, height } = getCanvasSize();
+  canvas.width = width;
+  canvas.height = height;
 
-    const freqLabel = document.createElement("div");
-    freqLabel.className = "band__freq";
-    freqLabel.textContent = formatFrequency(frequency);
+  const gap = Number(gapInput.value);
+  const leftMargin = getLeftMarginPx();
+  const availableWidth = width - leftMargin;
+  const bg = bgInput.value;
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, width, height);
 
-    const sliderWrapper = document.createElement("div");
-    sliderWrapper.className = "band__slider";
+  const config = getLayoutConfig();
 
-    const slider = document.createElement("input");
-    slider.type = "range";
-    slider.min = "-12";
-    slider.max = "12";
-    slider.step = "0.5";
-    slider.value = state.gains[index];
+  if (config.mosaic) {
+    const slots = [
+      { x: 0, y: 0, w: 0.6, h: 0.6 },
+      { x: 0.62, y: 0, w: 0.38, h: 0.35 },
+      { x: 0.62, y: 0.37, w: 0.38, h: 0.23 },
+      { x: 0, y: 0.62, w: 0.31, h: 0.38 },
+      { x: 0.33, y: 0.62, w: 0.67, h: 0.38 },
+    ];
 
-    const valueLabel = document.createElement("div");
-    valueLabel.className = "band__value";
-    valueLabel.textContent = `${state.gains[index]} dB`;
-
-    slider.addEventListener("input", (event) => {
-      const value = Number(event.target.value);
-      state.gains[index] = value;
-      valueLabel.textContent = `${value} dB`;
-      if (state.filters[index]) {
-        state.filters[index].gain.value = value;
-      }
+    slots.forEach((slot, index) => {
+      const img = images[index % images.length];
+      const x = leftMargin + slot.x * availableWidth + gap / 2;
+      const y = slot.y * height + gap / 2;
+      const w = slot.w * availableWidth - gap;
+      const h = slot.h * height - gap;
+      drawImageCover(img, x, y, w, h);
     });
 
-    sliderWrapper.appendChild(slider);
-    sliderWrapper.appendChild(valueLabel);
-
-    band.appendChild(freqLabel);
-    band.appendChild(sliderWrapper);
-
-    bandsContainer.appendChild(band);
-    state.bandControls.push({ slider, valueLabel });
-  });
-};
-
-const applyPreset = (presetKey) => {
-  if (presetKey === "reset") {
-    state.gains = Array(10).fill(0);
-    state.currentPreset = "flat";
-  } else if (presets[presetKey]) {
-    state.gains = [...presets[presetKey]];
-    state.currentPreset = presetKey;
-  }
-
-  state.filters.forEach((filter, index) => {
-    filter.gain.value = state.gains[index];
-  });
-  state.bandControls.forEach((control, index) => {
-    control.slider.value = state.gains[index];
-    control.valueLabel.textContent = `${state.gains[index]} dB`;
-  });
-  const label = presetLabels[state.currentPreset] || state.currentPreset.toUpperCase();
-  presetText.textContent = `Preset: ${label}`;
-};
-
-const setSourceType = async (sourceType) => {
-  if (state.sourceType === sourceType) {
-    return;
-  }
-  state.sourceType = sourceType;
-  if (state.source) {
-    state.source.disconnect();
-    state.source = null;
-  }
-  if (state.mediaStream) {
-    state.mediaStream.getTracks().forEach((track) => track.stop());
-    state.mediaStream = null;
-  }
-
-  if (sourceType === "mic") {
-    fileUpload.hidden = true;
-    micToggle.hidden = false;
-    audioElement.pause();
-    audioElement.removeAttribute("src");
-    audioElement.load();
-    setActiveSourceButton(sourceMicButton, sourceFileButton);
-    setStatus("Micrófono listo. Actívalo para comenzar.");
+    downloadBtn.disabled = false;
     return;
   }
 
-  fileUpload.hidden = false;
-  micToggle.hidden = true;
-  setActiveSourceButton(sourceFileButton, sourceMicButton);
-  setStatus("Carga un archivo para comenzar.");
-};
+  const layout =
+    config.auto ? getAutoGrid(images.length, availableWidth, height) : config;
+  const { rows, cols } = layout;
+  const cellW = (availableWidth - gap * (cols + 1)) / cols;
+  const cellH = (height - gap * (rows + 1)) / rows;
 
-const startMicrophone = async () => {
-  if (!ensureAudioContext()) {
-    return;
-  }
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    setStatus("El navegador no permite acceso al micrófono.", { warning: true });
-    return;
-  }
-  if (!window.isSecureContext) {
-    showNotice(
-      "El micrófono requiere HTTPS o localhost. Abre esta demo en un servidor local."
-    );
-  }
-  try {
-    state.mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    if (state.source) {
-      state.source.disconnect();
-      state.source = null;
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      const index = row * cols + col;
+      const img = images[index % images.length];
+      const x = leftMargin + gap + col * (cellW + gap);
+      const y = gap + row * (cellH + gap);
+      drawImageCover(img, x, y, cellW, cellH);
     }
-    connectAudioGraph();
-    micToggle.textContent = "Desactivar micrófono";
-    micToggle.dataset.active = "true";
-    setStatus("Micrófono activo. Ajusta las bandas en tiempo real.");
-  } catch (error) {
-    setStatus("No se pudo activar el micrófono.", { warning: true });
   }
-};
 
-const stopMicrophone = () => {
-  if (!state.mediaStream) {
+  downloadBtn.disabled = false;
+}
+
+function downloadCollage() {
+  const format = formatSelect.value;
+  if (format === "pdf" && window.jspdf) {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({
+      orientation: canvas.width >= canvas.height ? "l" : "p",
+      unit: "px",
+      format: [canvas.width, canvas.height],
+    });
+    const data = canvas.toDataURL("image/jpeg", 0.95);
+    pdf.addImage(data, "JPEG", 0, 0, canvas.width, canvas.height);
+    pdf.save("collage-carta.pdf");
     return;
   }
-  state.mediaStream.getTracks().forEach((track) => track.stop());
-  state.mediaStream = null;
-  if (state.source) {
-    state.source.disconnect();
-    state.source = null;
-  }
-  micToggle.textContent = "Activar micrófono";
-  micToggle.dataset.active = "false";
-  setStatus("Micrófono detenido.");
-};
 
-const init = () => {
-  renderBands();
-  presetText.textContent = "Preset: Flat";
-
-  if (location.protocol === "file:") {
-    showNotice(
-      "Si el audio no se carga, prueba abrir esta demo con un servidor local (python -m http.server 8000)."
-    );
-  } else {
-    hideNotice();
-  }
-};
-
-sourceFileButton.addEventListener("click", () => {
-  setSourceType("file");
-});
-
-sourceMicButton.addEventListener("click", () => {
-  setSourceType("mic");
-});
-
-micToggle.addEventListener("click", () => {
-  const isActive = micToggle.dataset.active === "true";
-  if (isActive) {
-    stopMicrophone();
-  } else {
-    startMicrophone();
-  }
-});
+  const link = document.createElement("a");
+  link.download = "collage.png";
+  link.href = canvas.toDataURL("image/png");
+  link.click();
+}
 
 fileInput.addEventListener("change", (event) => {
-  const [file] = event.target.files;
-  if (!file) {
-    return;
-  }
-  if (!ensureAudioContext()) {
-    return;
-  }
-  if (state.currentUrl) {
-    URL.revokeObjectURL(state.currentUrl);
-  }
-  const url = URL.createObjectURL(file);
-  state.currentUrl = url;
-  state.sourceType = "file";
-  audioElement.src = url;
-  audioElement.load();
-  connectAudioGraph();
-  setStatus(`Listo para reproducir: ${file.name}`);
+  loadImages(event.target.files);
 });
 
-audioElement.addEventListener("play", () => {
-  if (!ensureAudioContext()) {
-    return;
-  }
-  connectAudioGraph();
-  setStatus("Reproduciendo con ecualizador activo.");
-});
+renderBtn.addEventListener("click", renderCollage);
 
-audioElement.addEventListener("pause", () => {
-  setStatus("Pausado.");
-});
+downloadBtn.addEventListener("click", downloadCollage);
 
-audioElement.addEventListener("ended", () => {
-  setStatus("Finalizó la reproducción.");
-});
+const uploadLabel = document.querySelector(".upload");
 
-document.querySelectorAll("[data-preset]").forEach((button) => {
-  button.addEventListener("click", () => {
-    if (!ensureAudioContext()) {
-      return;
-    }
-    applyPreset(button.dataset.preset);
-    setStatus(`Preset aplicado: ${button.textContent}`);
+["dragenter", "dragover"].forEach((eventName) => {
+  uploadLabel.addEventListener(eventName, (event) => {
+    event.preventDefault();
+    uploadLabel.classList.add("dragging");
   });
 });
 
-masterGainSlider.addEventListener("input", (event) => {
-  const value = Number(event.target.value);
-  masterGainValue.textContent = `${value} dB`;
-  if (!ensureAudioContext()) {
-    return;
-  }
-  state.masterGain.gain.value = Math.pow(10, value / 20);
+["dragleave", "drop"].forEach((eventName) => {
+  uploadLabel.addEventListener(eventName, (event) => {
+    event.preventDefault();
+    uploadLabel.classList.remove("dragging");
+  });
 });
 
-bypassToggle.addEventListener("change", (event) => {
-  state.bypass = event.target.checked;
-  if (!ensureAudioContext()) {
-    return;
-  }
-  connectAudioGraph();
-  setStatus(state.bypass ? "EQ en bypass." : "EQ activo.");
+uploadLabel.addEventListener("drop", (event) => {
+  loadImages(event.dataTransfer.files);
 });
 
-init();
+renderBtn.addEventListener("click", () => {
+  if (!images.length) {
+    alert("Primero debes cargar algunas fotos.");
+  }
+});

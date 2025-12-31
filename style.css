@@ -234,3 +234,7 @@ canvas {
     grid-column: span 1;
   }
 }
+  .preview {
+    grid-column: span 1;
+  }
+}
